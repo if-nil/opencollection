@@ -94,8 +94,20 @@ test.describe('Request body rendering', () => {
     const section = endpointSection(page, 'echo json');
     const bodySection = section.locator('.request-body-section');
 
-    await expect(bodySection.locator('.section-title', { hasText: 'Body' })).toBeVisible();
+    await expect(bodySection.getByRole('heading', { name: 'Body', level: 3, exact: true })).toBeVisible();
     await expect(bodySection).toContainText('request-level-variable');
+  });
+
+  test('JSON body renders body schema tree annotations', async ({ page }) => {
+    const section = endpointSection(page, 'echo json');
+    const schema = section.locator('.body-schema-tree');
+
+    await expect(schema.getByRole('heading', { name: 'Body Schema', level: 3 })).toBeVisible();
+    await expect(schema.locator('.body-schema-row').filter({ hasText: 'test' })).toContainText('string');
+    await expect(schema.locator('.body-schema-row').filter({ hasText: 'test' })).toContainText('Echo payload field using');
+    await expect(schema.locator('.body-schema-row').filter({ hasText: 'metadata' })).toContainText('object');
+    await expect(schema.locator('.body-schema-row').filter({ hasText: 'traceId' })).toContainText('string');
+    await expect(schema.locator('.body-schema-row').filter({ hasText: 'traceId' })).toContainText('Nested trace identifier supplied by the client.');
   });
 
   test('form-urlencoded body renders as key=value pairs', async ({ page }) => {

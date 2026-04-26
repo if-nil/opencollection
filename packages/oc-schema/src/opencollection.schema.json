@@ -672,7 +672,7 @@
     },
     "RawBody": {
       "type": "object",
-      "description": "Raw request body with type and data",
+      "description": "Raw request body with type, data, and optional field annotations",
       "properties": {
         "type": {
           "type": "string",
@@ -682,10 +682,88 @@
         "data": {
           "type": "string",
           "description": "The raw body data"
+        },
+        "annotations": {
+          "type": "object",
+          "description": "Field-level annotations keyed by body paths such as user.name or items[].price",
+          "additionalProperties": {
+            "$ref": "#/$defs/BodyAnnotation"
+          }
         }
       },
       "required": ["type", "data"],
       "additionalProperties": false
+    },
+    "BodyAnnotation": {
+      "description": "A field-level body annotation",
+      "oneOf": [
+        {
+          "$ref": "#/$defs/BodyAnnotationDetails"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "content": {
+              "type": "string",
+              "description": "The content of the annotation"
+            },
+            "type": {
+              "type": "string",
+              "description": "The MIME type of the content"
+            }
+          },
+          "required": ["content", "type"],
+          "additionalProperties": false
+        },
+        {
+          "type": "string"
+        }
+      ]
+    },
+    "BodyAnnotationDetails": {
+      "type": "object",
+      "description": "A field-level body annotation with field type metadata",
+      "properties": {
+        "dataType": {
+          "type": "string",
+          "description": "The annotated field data type, such as string, number, integer, boolean, object, or array"
+        },
+        "description": {
+          "$ref": "#/$defs/BodyAnnotationDescription"
+        }
+      },
+      "anyOf": [
+        {
+          "required": ["dataType"]
+        },
+        {
+          "required": ["description"]
+        }
+      ],
+      "additionalProperties": false
+    },
+    "BodyAnnotationDescription": {
+      "description": "The field annotation description",
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "content": {
+              "type": "string",
+              "description": "The content of the description"
+            },
+            "type": {
+              "type": "string",
+              "description": "The MIME type of the content"
+            }
+          },
+          "required": ["content", "type"],
+          "additionalProperties": false
+        },
+        {
+          "type": "string"
+        }
+      ]
     },
     "FormUrlEncodedBody": {
       "type": "object",

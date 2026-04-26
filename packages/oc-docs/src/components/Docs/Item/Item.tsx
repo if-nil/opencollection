@@ -5,7 +5,14 @@ import 'prismjs/components/prism-graphql';
 import 'prismjs/components/prism-json';
 import 'prismjs/components/prism-xml-doc';
 import 'prismjs/components/prism-python';
-import type { HttpRequest } from '@opencollection/types/requests/http';
+import type {
+  BodyAnnotation,
+  BodyAnnotationDescription,
+  BodyAnnotationDetails,
+  BodyAnnotations,
+  HttpRequest
+} from '@opencollection/types/requests/http';
+import type { StructuredText } from '@opencollection/types/common/description';
 import type { Variable } from '@opencollection/types/common/variables';
 import { generateSectionId, getItemId } from '../../../utils/itemUtils';
 import {
@@ -45,6 +52,118 @@ const methodColors: Record<string, string> = {
   DELETE: '#ef4444',
   HEAD: '#8b5cf6',
   OPTIONS: '#06b6d4'
+};
+
+interface BodySchemaAnnotation {
+  path: string;
+  dataType?: string;
+  description?: BodyAnnotationDescription;
+}
+
+interface BodySchemaNode {
+  path: string;
+  label: string;
+  depth: number;
+  dataType?: string;
+  description?: BodyAnnotationDescription;
+  children: BodySchemaNode[];
+}
+
+const isStructuredText = (value: unknown): value is StructuredText =>
+  !!value &&
+  typeof value === 'object' &&
+  typeof (value as StructuredText).content === 'string' &&
+  typeof (value as StructuredText).type === 'string';
+
+const isBodyAnnotationDetails = (value: unknown): value is BodyAnnotationDetails =>
+  !!value &&
+  typeof value === 'object' &&
+  !isStructuredText(value) &&
+  ('dataType' in value || 'description' in value);
+
+const getAnnotationDescription = (annotation: BodyAnnotation): BodyAnnotationDescription | undefined => {
+  if (typeof annotation === 'string' || isStructuredText(annotation)) {
+    return annotation;
+  }
+
+  if (isBodyAnnotationDetails(annotation)) {
+    return annotation.description;
+  }
+
+  return undefined;
+};
+
+const getAnnotationDataType = (annotation: BodyAnnotation): string | undefined => {
+  if (isBodyAnnotationDetails(annotation)) {
+    return annotation.dataType;
+  }
+
+  return undefined;
+};
+
+const getBodySchemaAnnotations = (body: unknown): BodySchemaAnnotation[] => {
+  if (!body || typeof body !== 'object' || !('annotations' in body)) {
+    return [];
+  }
+
+  const annotations = (body as { annotations?: BodyAnnotations }).annotations;
+  if (!annotations || typeof annotations !== 'object') {
+    return [];
+  }
+
+  return Object.entries(annotations).map(([path, annotation]) => ({
+    path,
+    dataType: getAnnotationDataType(annotation),
+    description: getAnnotationDescription(annotation)
+  }));
+};
+
+const buildBodySchemaTree = (annotations: BodySchemaAnnotation[]): BodySchemaNode[] => {
+  const roots: BodySchemaNode[] = [];
+  const nodes = new Map<string, BodySchemaNode>();
+
+  const ensureNode = (path: string, depth: number): BodySchemaNode => {
+    const existing = nodes.get(path);
+    if (existing) {
+      return existing;
+    }
+
+    const parts = path.split('.');
+    const label = parts[parts.length - 1] || path;
+    const node: BodySchemaNode = {
+      path,
+      label,
+      depth,
+      children: []
+    };
+    nodes.set(path, node);
+
+    if (parts.length === 1) {
+      roots.push(node);
+    } else {
+      const parentPath = parts.slice(0, -1).join('.');
+      const parent = ensureNode(parentPath, depth - 1);
+      parent.children.push(node);
+    }
+
+    return node;
+  };
+
+  annotations.forEach((annotation) => {
+    const parts = annotation.path.split('.');
+    parts.forEach((_, index) => {
+      ensureNode(parts.slice(0, index + 1).join('.'), index);
+    });
+
+    const node = ensureNode(annotation.path, parts.length - 1);
+    node.dataType = annotation.dataType;
+    node.description = annotation.description;
+  });
+
+  const flatten = (items: BodySchemaNode[]): BodySchemaNode[] =>
+    items.flatMap((item) => [item, ...flatten(item.children)]);
+
+  return flatten(roots);
 };
 
 const Item = memo(({
@@ -172,6 +291,8 @@ const Item = memo(({
     const scripts = scriptsArrayToObject(getRequestScripts(httpItem));
 
     const examples = getRequestExamples(httpItem);
+    const body = getHttpBody(httpItem) || { mode: 'none' };
+    const bodySchemaNodes = buildBodySchemaTree(getBodySchemaAnnotations(body));
 
     const endpoint = {
       id: itemId,
@@ -180,7 +301,7 @@ const Item = memo(({
       url: getRequestUrl(httpItem),
       description: getItemDocs(httpItem) || '',
       headers: getHttpHeaders(httpItem),
-      body: getHttpBody(httpItem) || { mode: 'none' },
+      body,
       params: getHttpParams(httpItem),
       auth: getRequestAuth(httpItem) || { mode: 'none' },
       vars: getRequestVariables(httpItem),
@@ -292,6 +413,40 @@ const Item = memo(({
                     return bodyType || 'json';
                   })()}
                 />
+                {bodySchemaNodes.length > 0 && (
+                  <div className="body-schema-tree">
+                    <h3 className="section-title">Body Schema</h3>
+                    <div className="body-schema-list">
+                      {bodySchemaNodes.map((node) => (
+                        <div
+                          key={node.path}
+                          className="body-schema-row"
+                          style={{ '--schema-depth': node.depth } as React.CSSProperties}
+                        >
+                          <div className="body-schema-field">
+                            <code className="annotation-path">{node.label}</code>
+                            {node.dataType && (
+                              <span className="body-schema-type">{node.dataType}</span>
+                            )}
+                          </div>
+                          {node.description && (
+                            <div className="annotation-description">
+                              {typeof node.description === 'string' ? (
+                                <span>{node.description}</span>
+                              ) : (
+                                <div
+                                  dangerouslySetInnerHTML={{
+                                    __html: md.render(node.description.content)
+                                  }}
+                                />
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 

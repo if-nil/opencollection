@@ -160,6 +160,70 @@ export const StyledWrapper = styled.div`
     gap: 0.5rem;
   }
 
+  .body-schema-tree {
+    margin-top: 0.25rem;
+  }
+
+  .body-schema-list {
+    border: 1px solid var(--border-color);
+    border-radius: 0.375rem;
+    overflow: hidden;
+    background-color: var(--bg-primary);
+  }
+
+  .body-schema-row {
+    display: grid;
+    grid-template-columns: minmax(14rem, 32%) 1fr;
+    gap: 1rem;
+    align-items: flex-start;
+    padding: 0.625rem 0.75rem;
+    border-bottom: 1px solid var(--border-color);
+  }
+
+  .body-schema-row:last-child {
+    border-bottom: none;
+  }
+
+  .body-schema-field {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding-left: calc(var(--schema-depth, 0) * 1.25rem);
+    min-width: 0;
+  }
+
+  .body-schema-type {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 999px;
+    background-color: #eef2ff;
+    color: #3730a3;
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    line-height: 1;
+    padding: 0.1875rem 0.5rem;
+    white-space: nowrap;
+  }
+
+  .annotation-path {
+    font-family: var(--font-mono);
+    font-size: 0.8125rem;
+    color: var(--text-primary);
+    background-color: var(--badge-bg);
+    border-radius: 0.25rem;
+    padding: 0.125rem 0.375rem;
+  }
+
+  .annotation-description {
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+    min-width: 0;
+  }
+
+  .annotation-description p {
+    margin: 0;
+  }
+
   .endpoint-badges {
     display: flex;
     align-items: center;

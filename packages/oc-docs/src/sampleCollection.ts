@@ -82,7 +82,23 @@ items:
       data: |
         {
           "test": "{{request-level-variable}}",
+          "metadata": {
+            "traceId": "trace-123"
+          }
         }
+      annotations:
+        test:
+          dataType: "string"
+          description: "你好"
+        metadata:
+          dataType: "object"
+          description: "Request metadata object."
+        metadata.traceId:
+          dataType: "object"
+          description: "Nested trace identifier supplied by the client."
+        metadata.traceId.aaa:
+          dataType: "string"
+          description: "Nested trace identifier supplied by the client."
     assertions:
       - expression: "res.status"
         operator: "eq"

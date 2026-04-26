@@ -4,7 +4,7 @@
 
 import type { Auth } from '../common/auth';
 import type { Action } from '../common/actions';
-import type { Description } from '../common/description';
+import type { Description, StructuredText } from '../common/description';
 import type { Assertion } from '../common/assertions';
 import type { Scripts } from '../common/scripts';
 import type { Variable } from '../common/variables';
@@ -30,9 +30,21 @@ export interface HttpRequestParam {
   disabled?: boolean;
 }
 
+export type BodyAnnotationDescription = string | StructuredText;
+
+export interface BodyAnnotationDetails {
+  dataType?: string;
+  description?: BodyAnnotationDescription;
+}
+
+export type BodyAnnotation = BodyAnnotationDescription | BodyAnnotationDetails;
+
+export type BodyAnnotations = Record<string, BodyAnnotation>;
+
 export interface RawBody {
   type: 'json' | 'text' | 'xml' | 'sparql';
   data: string;
+  annotations?: BodyAnnotations;
 }
 
 export interface FormUrlEncodedEntry {
