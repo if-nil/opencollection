@@ -89,12 +89,12 @@ items:
       annotations:
         test:
           dataType: "string"
-          description: "你好"
+          description: "Echo payload field using the request-level variable."
         metadata:
           dataType: "object"
           description: "Request metadata object."
         metadata.traceId:
-          dataType: "object"
+          dataType: "string"
           description: "Nested trace identifier supplied by the client."
         metadata.traceId.aaa:
           dataType: "string"
@@ -313,11 +313,19 @@ items:
     headers:
       - name: "Content-Type"
         value: "application/json"
+        description: "Payload format for the full replacement request."
       - name: "Authorization"
         value: "Bearer {{bearer_auth_token}}"
+        description: "Bearer access token for the current operator."
       - name: "X-Deprecated-Header"
         value: "old-value"
         disabled: true
+        description: "Legacy compatibility header retained for older clients."
+    params:
+      - name: "id"
+        value: "1"
+        type: "path"
+        description: "User identifier from the URL path."
     body:
       type: "json"
       data: |
@@ -455,13 +463,17 @@ items:
       data:
         - name: "name"
           value: "Alice"
+          description: "Display name of the sender."
         - name: "email"
           value: "alice@example.com"
+          description: "Sender email address."
         - name: "message"
           value: "Hello from the form"
+          description: "Free-form contact request body."
         - name: "debug"
           value: "true"
           disabled: true
+          description: "Internal troubleshooting toggle."
     docs: "Submit a contact form using URL-encoded form data."
     examples:
       - name: "Submitted"
@@ -493,12 +505,15 @@ items:
         - name: "file"
           type: "file"
           value: "/path/to/document.pdf"
+          description: "Primary document to upload."
         - name: "description"
           type: "text"
           value: "Quarterly report"
+          description: "Human-readable summary for the uploaded file."
         - name: "tags"
           type: "text"
           value: "report,quarterly"
+          description: "Comma-separated labels used for downstream search."
     docs: "Upload a file with metadata using multipart form data."
     examples:
       - name: "Uploaded"
@@ -589,16 +604,20 @@ items:
       - name: "q"
         value: "alice"
         type: "query"
+        description: "Full-text search term."
       - name: "role"
         value: "admin"
         type: "query"
+        description: "Role filter for the result set."
       - name: "status"
         value: "active"
         type: "query"
+        description: "Lifecycle status filter."
       - name: "verbose"
         value: "true"
         type: "query"
         disabled: true
+        description: "Include additional debug metadata in the response."
     headers:
       - name: "Accept"
         value: "application/json"

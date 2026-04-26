@@ -10,9 +10,13 @@ import type {
   BodyAnnotationDescription,
   BodyAnnotationDetails,
   BodyAnnotations,
-  HttpRequest
+  FormUrlEncodedBody,
+  HttpRequest,
+  HttpRequestHeader,
+  HttpRequestParam,
+  MultipartFormBody
 } from '@opencollection/types/requests/http';
-import type { StructuredText } from '@opencollection/types/common/description';
+import type { Description, StructuredText } from '@opencollection/types/common/description';
 import type { Variable } from '@opencollection/types/common/variables';
 import { generateSectionId, getItemId } from '../../../utils/itemUtils';
 import {
@@ -67,6 +71,16 @@ interface BodySchemaNode {
   dataType?: string;
   description?: BodyAnnotationDescription;
   children: BodySchemaNode[];
+}
+
+type DocumentedFieldDescription = Description | BodyAnnotationDescription | undefined;
+
+interface DocumentedFieldRow {
+  name: string;
+  value: string;
+  type?: string;
+  description?: DocumentedFieldDescription;
+  enabled: boolean;
 }
 
 const isStructuredText = (value: unknown): value is StructuredText =>
@@ -166,6 +180,99 @@ const buildBodySchemaTree = (annotations: BodySchemaAnnotation[]): BodySchemaNod
   return flatten(roots);
 };
 
+const normalizeTableValue = (value: unknown): string => {
+  if (Array.isArray(value)) {
+    return value.join(', ');
+  }
+
+  if (value === null || value === undefined) {
+    return '';
+  }
+
+  return typeof value === 'string' ? value : String(value);
+};
+
+const getDocumentedParamRows = (
+  params: HttpRequestParam[] | undefined,
+  paramType: 'query' | 'path'
+): DocumentedFieldRow[] => {
+  if (!params || params.length === 0) {
+    return [];
+  }
+
+  return params
+    .filter((param) => param.type === paramType)
+    .map((param) => ({
+      name: param.name,
+      value: param.value,
+      type: param.type,
+      description: param.description,
+      enabled: param.disabled !== true
+    }));
+};
+
+const getDocumentedHeaderRows = (headers: HttpRequestHeader[] | undefined): DocumentedFieldRow[] => {
+  if (!headers || headers.length === 0) {
+    return [];
+  }
+
+  return headers.map((header) => ({
+    name: header.name,
+    value: header.value,
+    description: header.description,
+    enabled: header.disabled !== true
+  }));
+};
+
+const getBodyDocumentedFieldRows = (body: unknown): {
+  formFields: DocumentedFieldRow[];
+  multipartFields: DocumentedFieldRow[];
+} => {
+  if (!body || typeof body !== 'object' || Array.isArray(body) || !('type' in body)) {
+    return {
+      formFields: [],
+      multipartFields: []
+    };
+  }
+
+  if ((body as FormUrlEncodedBody).type === 'form-urlencoded') {
+    const formBody = body as FormUrlEncodedBody;
+    return {
+      formFields: formBody.data
+        .filter((entry) => entry.disabled !== true)
+        .map((entry) => ({
+          name: entry.name,
+          value: entry.value,
+          type: 'form-urlencoded',
+          description: entry.description,
+          enabled: true
+        })),
+      multipartFields: []
+    };
+  }
+
+  if ((body as MultipartFormBody).type === 'multipart-form') {
+    const multipartBody = body as MultipartFormBody;
+    return {
+      formFields: [],
+      multipartFields: multipartBody.data
+        .filter((entry) => entry.disabled !== true)
+        .map((entry) => ({
+          name: entry.name,
+          value: normalizeTableValue(entry.value),
+          type: entry.type,
+          description: entry.description,
+          enabled: true
+        }))
+    };
+  }
+
+  return {
+    formFields: [],
+    multipartFields: []
+  };
+};
+
 const Item = memo(({
   item,
   parentPath = '',
@@ -182,6 +289,43 @@ const Item = memo(({
   const md = useMarkdownRenderer();
   const itemId = getItemId(item);
   const sectionId = generateSectionId(item, parentPath);
+  const renderDescription = (description: DocumentedFieldDescription) => {
+    if (!description) {
+      return null;
+    }
+
+    if (typeof description === 'string') {
+      return <span>{description}</span>;
+    }
+
+    return (
+      <div
+        dangerouslySetInnerHTML={{
+          __html: md.render(description.content)
+        }}
+      />
+    );
+  };
+
+  const documentedFieldColumns = (includeType: boolean) => [
+    { key: 'name', label: 'Name', width: includeType ? '18%' : '22%' },
+    { key: 'value', label: 'Value', width: includeType ? '22%' : '28%' },
+    ...(includeType
+      ? [{ key: 'type', label: 'Type', width: '14%' }]
+      : []),
+    {
+      key: 'description',
+      label: 'Description',
+      width: includeType ? '31%' : '35%',
+      render: (_value: unknown, row: DocumentedFieldRow) => renderDescription(row.description)
+    },
+    {
+      key: 'enabled',
+      label: '',
+      width: '15%',
+      render: (value: boolean) => value ? null : <StatusBadge status="inactive" text="Disabled" />
+    }
+  ];
 
   if (isFolder(item)) {
     const folderItem = item as any;
@@ -293,6 +437,10 @@ const Item = memo(({
     const examples = getRequestExamples(httpItem);
     const body = getHttpBody(httpItem) || { mode: 'none' };
     const bodySchemaNodes = buildBodySchemaTree(getBodySchemaAnnotations(body));
+    const queryParamRows = getDocumentedParamRows(getHttpParams(httpItem), 'query');
+    const pathParamRows = getDocumentedParamRows(getHttpParams(httpItem), 'path');
+    const headerRows = getDocumentedHeaderRows(getHttpHeaders(httpItem));
+    const { formFields, multipartFields } = getBodyDocumentedFieldRows(body);
 
     const endpoint = {
       id: itemId,
@@ -353,27 +501,27 @@ const Item = memo(({
 
         <div className="item-content-main">
           <div className="request-details">
-            {endpoint.params && endpoint.params.length > 0 && (
+            {queryParamRows.length > 0 && (
               <MinimalDataTable
-                data={endpoint.params}
+                data={queryParamRows}
                 title="Query Parameters"
-                columns={[
-                  { key: 'name', label: 'Name', width: '35%' },
-                  { key: 'value', label: 'Value', width: '45%' },
-                  { key: 'enabled', label: '', width: '20%', render: (val: any) => val === false ? <StatusBadge status="inactive" text="Disabled" /> : null }
-                ]}
+                columns={documentedFieldColumns(true)}
               />
             )}
 
-            {endpoint.headers && endpoint.headers.length > 0 && (
+            {pathParamRows.length > 0 && (
               <MinimalDataTable
-                data={endpoint.headers}
+                data={pathParamRows}
+                title="Path Parameters"
+                columns={documentedFieldColumns(true)}
+              />
+            )}
+
+            {headerRows.length > 0 && (
+              <MinimalDataTable
+                data={headerRows}
                 title="Headers"
-                columns={[
-                  { key: 'name', label: 'Name', width: '35%' },
-                  { key: 'value', label: 'Value', width: '45%' },
-                  { key: 'enabled', label: '', width: '20%', render: (val: any) => val === false ? <StatusBadge status="inactive" text="Disabled" /> : null }
-                ]}
+                columns={documentedFieldColumns(false)}
               />
             )}
 
@@ -413,6 +561,20 @@ const Item = memo(({
                     return bodyType || 'json';
                   })()}
                 />
+                {formFields.length > 0 && (
+                  <MinimalDataTable
+                    data={formFields}
+                    title="Form Fields"
+                    columns={documentedFieldColumns(true)}
+                  />
+                )}
+                {multipartFields.length > 0 && (
+                  <MinimalDataTable
+                    data={multipartFields}
+                    title="Multipart Fields"
+                    columns={documentedFieldColumns(true)}
+                  />
+                )}
                 {bodySchemaNodes.length > 0 && (
                   <div className="body-schema-tree">
                     <h3 className="section-title">Body Schema</h3>

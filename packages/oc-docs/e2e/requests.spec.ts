@@ -82,6 +82,15 @@ test.describe('Request headers table', () => {
     await expect(headersTable.getByRole('cell', { name: 'Authorization', exact: true })).toBeVisible();
     await expect(headersTable.getByRole('cell', { name: 'X-Deprecated-Header', exact: true })).toBeVisible();
   });
+
+  test('header descriptions render in the table', async ({ page }) => {
+    const section = endpointSection(page, 'update user');
+    const headersTable = section.locator('.minimal-table').filter({ hasText: 'Headers' });
+
+    const row = headersTable.locator('tr').filter({ hasText: 'Authorization' });
+    await expect(row).toBeVisible();
+    await expect(row.getByRole('cell', { name: 'Bearer access token for the current operator.', exact: true })).toBeVisible();
+  });
 });
 
 test.describe('Request body rendering', () => {
@@ -130,6 +139,30 @@ test.describe('Request body rendering', () => {
     await expect(bodySection).toContainText('file: /path/to/document.pdf');
     await expect(bodySection).toContainText('description: Quarterly report');
     await expect(bodySection).toContainText('tags: report,quarterly');
+  });
+
+  test('form-urlencoded body renders documented field rows', async ({ page }) => {
+    const section = endpointSection(page, 'submit form');
+    const formTable = section.locator('.minimal-table').filter({ hasText: 'Form Fields' });
+
+    await expect(formTable).toBeVisible();
+    const row = formTable.locator('tr').filter({ hasText: 'email' });
+    await expect(row).toBeVisible();
+    await expect(row.getByRole('cell', { name: 'form-urlencoded', exact: true })).toBeVisible();
+    await expect(row.getByRole('cell', { name: 'Sender email address.', exact: true })).toBeVisible();
+  });
+
+  test('multipart-form body renders documented field rows', async ({ page }) => {
+    const section = endpointSection(page, 'upload file');
+    const formTable = section.locator('.minimal-table').filter({ hasText: 'Multipart Fields' });
+
+    await expect(formTable).toBeVisible();
+    const row = formTable.getByRole('row', {
+      name: /^file \/path\/to\/document\.pdf file Primary document to upload\.$/
+    });
+    await expect(row).toBeVisible();
+    await expect(row.getByRole('cell', { name: '/path/to/document.pdf', exact: true })).toBeVisible();
+    await expect(row.getByRole('cell', { name: 'Primary document to upload.', exact: true })).toBeVisible();
   });
 
   test('XML body renders in code view', async ({ page }) => {
@@ -195,6 +228,29 @@ test.describe('Query parameters table', () => {
     const row = paramsTable.locator('tr').filter({ hasText: 'verbose' });
     await expect(row).toBeVisible();
     await expect(row.getByRole('cell', { name: 'true', exact: true })).toBeVisible();
+  });
+
+  test('renders query parameter type and description', async ({ page }) => {
+    const section = endpointSection(page, 'search users');
+    const paramsTable = section.locator('.minimal-table').filter({ hasText: 'Query Parameters' });
+
+    const row = paramsTable.getByRole('row', {
+      name: /^q alice query Full-text search term\.$/
+    });
+    await expect(row).toBeVisible();
+    await expect(row.getByRole('cell', { name: 'query', exact: true })).toBeVisible();
+    await expect(row.getByRole('cell', { name: 'Full-text search term.', exact: true })).toBeVisible();
+  });
+
+  test('renders path parameters in a dedicated table', async ({ page }) => {
+    const section = endpointSection(page, 'update user');
+    const paramsTable = section.locator('.minimal-table').filter({ hasText: 'Path Parameters' });
+
+    await expect(paramsTable).toBeVisible();
+    const row = paramsTable.locator('tr').filter({ hasText: 'id' });
+    await expect(row).toBeVisible();
+    await expect(row.getByRole('cell', { name: 'path', exact: true })).toBeVisible();
+    await expect(row.getByRole('cell', { name: 'User identifier from the URL path.', exact: true })).toBeVisible();
   });
 
   test('endpoint without explicit params does not show params table', async ({ page }) => {
